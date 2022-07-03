@@ -5,20 +5,21 @@ const createUserSchema = new Schema(
   {
     name: {
       type: String,
-      required: true,
+      required: [true, "Name is required"],
     },
     email: {
       type: String,
-      required: true,
+      required: [true, "Email is required"],
       trim: true,
     },
-    status: {
-      type: Boolean,
-      default: false,
-    },
-    temPassword: {
+
+    password: {
       type: String,
-      required: true,
+      required: [true, "temporary password is required"],
+    },
+    accountType: {
+      type: String,
+      required: [true, "Account Type is required"],
     },
   },
   { timestamps: true }

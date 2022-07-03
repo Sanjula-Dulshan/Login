@@ -1,17 +1,20 @@
 import Admin from "../models/createUser.js";
+import bcrypt from "bcrypt";
+
+const temPasswordHash = await bcrypt.hash("12345678", 12);
 
 const Admins = [
   {
     name: "Sanjula",
-    email: "sdulshan10@gmail.com",
-    status: true,
-    temPassword: "12345678",
+    email: "sdulshan123@gmail.com",
+    accountType: "admin",
+    password: temPasswordHash,
   },
   {
     name: "Dilsha",
     email: "dilsha99t@gmail.com",
-    status: true,
-    temPassword: "12345678",
+    accountType: "student",
+    password: temPasswordHash,
   },
 ];
 

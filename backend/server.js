@@ -22,3 +22,7 @@ app.use(express.json());
 app.use(cors());
 app.use(bodyParser.json());
 app.use(cookieParser());
+
+//Routes
+import userRoutes from "./routes/userRoutes.js";
+app.use("/user", userRoutes);
