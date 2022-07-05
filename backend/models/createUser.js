@@ -21,6 +21,10 @@ const createUserSchema = new Schema(
       type: String,
       required: [true, "Account Type is required"],
     },
+    isFirstLogin: {
+      type: Boolean,
+      default: true,
+    },
   },
   { timestamps: true }
 );

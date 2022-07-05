@@ -45,7 +45,7 @@ export const createUser = async (req, res) => {
     }).then((data) => {
       res.status(200).json(data);
 
-      const url = `${process.env.CLIENT_URL}/user/login`;
+      const url = `${process.env.CLIENT_URL}/user/firstLogin`;
       console.log("url", url);
 
       //Send temporary password and login url to user email
@@ -56,8 +56,8 @@ export const createUser = async (req, res) => {
   }
 };
 
-//Login user
-export const loginUser = async (req, res) => {
+//First Login user
+export const firstLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
     if (!email || !password) {
@@ -95,23 +95,64 @@ export const loginUser = async (req, res) => {
     res.status(400).json(err);
   }
 };
-//Reset password
-export const resetPassword = async (req, res) => {
+
+//Login user
+export const loginUser = async (req, res) => {
   try {
     const { email, password } = req.body;
-
     if (!email || !password) {
       return res.status(400).json({
         msg: "Please fill all the fields",
       });
     }
+
     //Check if email already exists
-    const user = await CreateUser.findOne({ email });
+    const user = await User.findOne({ email });
     if (!user) {
       return res.status(400).json({
         msg: "User does not exist",
       });
     }
+    //Check if password is correct
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({
+        msg: "Password is incorrect",
+      });
+    }
+    //refresh token
+    const refresh_token = createRefreshToken({ id: user._id });
+    res.cookie("refreshtoken", refresh_token, {
+      httpOnly: true,
+      path: "/user/refresh_token",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+    });
+
+    return res.status(200).json({
+      msg: "Login Success",
+    });
+  } catch (err) {
+    res.status(400).json(err);
+  }
+};
+
+//Reset password
+export const resetPassword = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // if (!email || !password) {
+    //   return res.status(400).json({
+    //     msg: "Please fill all the fields",
+    //   });
+    // }
+    // //Check if email already exists
+    // const user = await CreateUser.findOne({ email });
+    // if (!user) {
+    //   return res.status(400).json({
+    //     msg: "User does not exist",
+    //   });
+    // }
 
     //check password length
     if (password.length < 8) {
@@ -141,11 +182,11 @@ export const registerUser = async (req, res) => {
     const { id, firstName, lastName, email, dateOfBirth, mobile, status } =
       req.body;
 
-    if (!firstName || !lastName || !dateOfBirth || !mobile || !status) {
-      return res.status(400).json({
-        msg: "Please fill all the fields",
-      });
-    }
+    // if (!firstName || !lastName || !dateOfBirth || !mobile) {
+    //   return res.status(400).json({
+    //     msg: "Please fill all the fields",
+    //   });
+    // }
 
     await User.create({
       id,
@@ -155,11 +196,15 @@ export const registerUser = async (req, res) => {
       dateOfBirth,
       mobile,
       status,
-    }).then((data) => {
-      res.status(200).json(data);
+    }).then(() => {
+      return res.status(200).json({
+        msg: "register Success",
+      });
     });
   } catch (err) {
-    res.status(400).json(err);
+    return res.status(400).json({
+      msg: err,
+    });
   }
 };
 
@@ -174,6 +219,18 @@ export const getAllUsersInfo = async (req, res) => {
       });
   } catch (err) {
     res.status(400).json(err);
+  }
+};
+
+//Get user information
+export const getUserInfo = async (req, res) => {
+  console.log("getUserInfo", req.user);
+  try {
+    const user = await CreateUser.findById(req.user.id).select("-password");
+
+    res.json(user);
+  } catch (err) {
+    return res.status(500).json({ msg: err.message });
   }
 };
 
