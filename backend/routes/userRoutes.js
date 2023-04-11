@@ -5,6 +5,7 @@ import {
   getAccessToken,
   getAllUsersInfo,
   getUserInfo,
+  googleLogin,
   loginUser,
   logout,
   registerUser,
@@ -15,6 +16,7 @@ import authAdmin from "../middleware/authAdmin.js";
 const router = express.Router();
 
 router.post("/login", loginUser);
+router.post("/google_login", googleLogin);
 router.post("/refresh_token", getAccessToken);
 router.post("/forgot", forgotPassword);
 router.post("/reset", auth, resetPassword);

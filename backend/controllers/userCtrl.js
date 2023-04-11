@@ -3,6 +3,11 @@ import jwt from "jsonwebtoken";
 import User from "../models/user.js";
 import sendMail from "./sendMail.js";
 
+import { google } from "googleapis";
+const { OAuth2 } = google.auth;
+
+const client = new OAuth2(process.env.MAILING_SERVICE_CLIENT_ID);
+
 //Login user
 export const loginUser = async (req, res) => {
   try {
@@ -43,20 +48,70 @@ export const loginUser = async (req, res) => {
   }
 };
 
+//google login
+export const googleLogin = async (req, res) => {
+  try {
+    const { tokenId } = req.body;
+
+    const verify = await client.verifyIdToken({
+      idToken: tokenId,
+      audience: process.env.MAILING_SERVICE_CLIENT_ID,
+    });
+
+    const { email_verified, email, name } = verify.payload;
+
+    const password = email + process.env.GOOGLE_SECRET;
+
+    const passwordHash = await bcrypt.hash(password, 12);
+    console.log("password", password);
+
+    if (!email_verified)
+      return res.status(400).json({ msg: "Email verification failed." });
+
+    const user = await User.findOne({ email });
+
+    if (user) {
+      const isMatch = await bcrypt.compare(password, user.password); //
+      if (!isMatch)
+        return res.status(400).json({ msg: "Password is incorrect." });
+
+      const refresh_token = createRefreshToken({ id: user._id });
+      res.cookie("refreshtoken", refresh_token, {
+        httpOnly: true,
+        path: "/user/refresh_token",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      res.json({ msg: "Login success!" });
+    } else {
+      const newUser = new User({
+        name,
+        email,
+        password: passwordHash,
+      });
+
+      await newUser.save();
+
+      const refresh_token = createRefreshToken({ id: newUser._id });
+      res.cookie("refreshtoken", refresh_token, {
+        httpOnly: true,
+        path: "/user/refresh_token",
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      res.json({ msg: "Login success!" });
+    }
+  } catch (err) {
+    return res.status(500).json({ msg: err.message });
+  }
+};
+
 //Register user
 export const registerUser = async (req, res) => {
   try {
-    const { id, firstName, lastName, email, password, dateOfBirth, mobile } =
-      req.body;
+    const { name, email, password } = req.body;
 
-    if (
-      !firstName ||
-      !lastName ||
-      !email ||
-      !password ||
-      !dateOfBirth ||
-      !mobile
-    ) {
+    if (!name || !email || !password) {
       return res.status(400).json({
         msg: "Please fill all the fields",
       });
@@ -81,13 +136,9 @@ export const registerUser = async (req, res) => {
     const passwordHash = await bcrypt.hash(password, 12);
 
     const newUser = {
-      id,
-      firstName,
-      lastName,
+      name,
       email,
       password: passwordHash,
-      dateOfBirth,
-      mobile,
     };
     const activation_token = createActivationToken(newUser);
 
@@ -113,21 +164,16 @@ export const activateEmail = async (req, res) => {
       process.env.ACTIVATION_TOKEN_SECRET
     );
 
-    const { id, firstName, lastName, email, password, dateOfBirth, mobile } =
-      user;
+    const { name, email, password } = user;
 
     const check = await User.findOne({ email });
     if (check)
       return res.status(400).json({ msg: "This email already exists." });
 
     const newUser = new User({
-      id,
-      firstName,
-      lastName,
+      name,
       email,
       password,
-      dateOfBirth,
-      mobile,
     });
 
     await newUser.save();

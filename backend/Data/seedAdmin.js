@@ -6,13 +6,10 @@ const temPasswordHash = await bcrypt.hash("12345678", 12);
 const Admins = [
   {
     id: "1",
-    firstName: "sanjula",
-    lastName: "dulshan",
-    email: "sdulshan123@gmail.com",
+    name: "sanjula",
+    email: "sdulshan10@gmail.com",
     accountType: "admin",
     password: temPasswordHash,
-    dateOfBirth: "2022-07-03",
-    mobile: "0719647830",
   },
 ];
 
