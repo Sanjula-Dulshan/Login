@@ -1,11 +1,11 @@
-import User from "../models/createUser.js";
+import User from "../models/user.js";
 
 const authAdmin = async (req, res, next) => {
   try {
-    console.log("user", req.user);
     const user = await User.findOne({ _id: req.user.id });
+    console.log("user", user);
 
-    if (user.accountType != "admin")
+    if (user?.accountType != "admin")
       return res.status(500).json({ msg: "Admin resources access denied." });
 
     next();

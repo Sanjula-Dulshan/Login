@@ -1,5 +1,4 @@
 import mongoose from "mongoose";
-import seedAdmin from "./Data/seedAdmin.js";
 
 //Database connection
 const connectDB = async () => {
@@ -10,7 +9,6 @@ const connectDB = async () => {
     })
     .then(() => {
       console.log("MongoDB Connected...");
-      seedAdmin();
     })
     .catch((err) => {
       console.log("MongoDB connection Failed...", err.message);

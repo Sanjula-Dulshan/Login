@@ -1,100 +1,7 @@
-import CreateUser from "../models/createUser.js";
-import User from "../models/user.js";
-import { nanoid } from "nanoid";
-import sendMail from "./sendMail.js";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
-
-//create user to the system
-export const createUser = async (req, res) => {
-  try {
-    const { name, email, accountType } = req.body;
-
-    //Generate random password with 8 characters
-    const temPassword = nanoid(8);
-
-    if (!name || !email || !accountType) {
-      return res.status(400).json({
-        msg: "Please fill all the fields",
-      });
-    }
-    //Check if email is valid
-    if (!validateEmail(email)) {
-      return res.status(400).json({
-        msg: "Please enter valid email",
-      });
-    }
-
-    //Check if email already exists
-    const user = await CreateUser.findOne({ email });
-    if (user) {
-      return res.status(400).json({
-        msg: "User already exists",
-      });
-    }
-
-    //Hash password
-    const temPasswordHash = await bcrypt.hash(temPassword, 12);
-
-    //Create new user
-    await CreateUser.create({
-      name,
-      email,
-      accountType,
-      password: temPasswordHash,
-    }).then((data) => {
-      res.status(200).json(data);
-
-      const url = `${process.env.CLIENT_URL}/user/firstLogin`;
-      console.log("url", url);
-
-      //Send temporary password and login url to user email
-      sendMail(name, temPassword, email, url);
-    });
-  } catch (err) {
-    res.status(400).json(err);
-  }
-};
-
-//First Login user
-export const firstLogin = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({
-        msg: "Please fill all the fields",
-      });
-    }
-
-    //Check if email already exists
-    const user = await CreateUser.findOne({ email });
-    if (!user) {
-      return res.status(400).json({
-        msg: "User does not exist",
-      });
-    }
-    //Check if password is correct
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-      return res.status(400).json({
-        msg: "Password is incorrect",
-      });
-    }
-    //refresh token
-    const refresh_token = createRefreshToken({ id: user._id });
-    res.cookie("refreshtoken", refresh_token, {
-      httpOnly: true,
-      path: "/user/refresh_token",
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-    });
-
-    return res.status(200).json({
-      msg: "Login Success",
-    });
-  } catch (err) {
-    res.status(400).json(err);
-  }
-};
+import User from "../models/user.js";
+import sendMail from "./sendMail.js";
 
 //Login user
 export const loginUser = async (req, res) => {
@@ -136,75 +43,138 @@ export const loginUser = async (req, res) => {
   }
 };
 
-//Reset password
-export const resetPassword = async (req, res) => {
-  try {
-    const { email, password } = req.body;
-
-    // if (!email || !password) {
-    //   return res.status(400).json({
-    //     msg: "Please fill all the fields",
-    //   });
-    // }
-    // //Check if email already exists
-    // const user = await CreateUser.findOne({ email });
-    // if (!user) {
-    //   return res.status(400).json({
-    //     msg: "User does not exist",
-    //   });
-    // }
-
-    //check password length
-    if (password.length < 8) {
-      return res.status(400).json({
-        msg: "Password must be at least 8 characters long",
-      });
-    }
-    //Hash password
-    const passwordHash = await bcrypt.hash(password, 12);
-    //Update password
-    await CreateUser.findOneAndUpdate(
-      { email },
-      { password: passwordHash }
-    ).then(() => {
-      res.status(200).json({
-        msg: "Password reset successfully",
-      });
-    });
-  } catch (err) {
-    res.status(400).json(err);
-  }
-};
-
 //Register user
 export const registerUser = async (req, res) => {
   try {
-    const { id, firstName, lastName, email, dateOfBirth, mobile, status } =
+    const { id, firstName, lastName, email, password, dateOfBirth, mobile } =
       req.body;
 
-    // if (!firstName || !lastName || !dateOfBirth || !mobile) {
-    //   return res.status(400).json({
-    //     msg: "Please fill all the fields",
-    //   });
-    // }
+    if (
+      !firstName ||
+      !lastName ||
+      !email ||
+      !password ||
+      !dateOfBirth ||
+      !mobile
+    ) {
+      return res.status(400).json({
+        msg: "Please fill all the fields",
+      });
+    }
 
-    await User.create({
+    //Check if email is valid
+    if (!validateEmail(email)) {
+      return res.status(400).json({
+        msg: "Please enter valid email",
+      });
+    }
+
+    //Check if email already exists
+    const user = await User.findOne({ email });
+    if (user) {
+      return res.status(400).json({
+        msg: "User already exists",
+      });
+    }
+
+    //Hash the password
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    const newUser = {
       id,
       firstName,
       lastName,
       email,
+      password: passwordHash,
       dateOfBirth,
       mobile,
-      status,
-    }).then(() => {
-      return res.status(200).json({
-        msg: "register Success",
-      });
+    };
+    const activation_token = createActivationToken(newUser);
+
+    const url = `${process.env.CLIENT_URL}/user/activate/${activation_token}`;
+    console.log("url", url);
+    sendMail(email, url, "Verify your email address");
+    res.json({
+      msg: "Register Success! Please activate your email to start.",
     });
   } catch (err) {
     return res.status(400).json({
       msg: err,
     });
+  }
+};
+
+//Activate user
+export const activateEmail = async (req, res) => {
+  try {
+    const { activation_token } = req.body;
+    const user = jwt.verify(
+      activation_token,
+      process.env.ACTIVATION_TOKEN_SECRET
+    );
+
+    const { id, firstName, lastName, email, password, dateOfBirth, mobile } =
+      user;
+
+    const check = await User.findOne({ email });
+    if (check)
+      return res.status(400).json({ msg: "This email already exists." });
+
+    const newUser = new User({
+      id,
+      firstName,
+      lastName,
+      email,
+      password,
+      dateOfBirth,
+      mobile,
+    });
+
+    await newUser.save();
+
+    res.json({ msg: "Account has been activated!" });
+  } catch (err) {
+    return res.status(500).json({ msg: err.message });
+  }
+};
+
+//Forgot password
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(400).json({ msg: "This email does not exist." });
+
+    const access_token = createAccessToken({ id: user._id });
+    const url = `${process.env.CLIENT_URL}/user/reset/${access_token}`;
+
+    console.log("url", url);
+    console.log("email", email);
+    sendMail(email, url, "Reset your password");
+    res.json({ msg: "Password reset link sent" });
+  } catch (err) {
+    return res.status(500).json({ msg: err.message });
+  }
+};
+
+//Reset password
+export const resetPassword = async (req, res) => {
+  try {
+    const { password } = req.body;
+    console.log(password);
+    const passwordHash = await bcrypt.hash(password, 12);
+
+    await User.findOneAndUpdate(
+      { _id: req.user.id },
+      {
+        password: passwordHash,
+      }
+    );
+
+    res.json({ msg: "Password successfully changed!" });
+  } catch (err) {
+    return res.status(500).json({ msg: err.message });
   }
 };
 
@@ -226,7 +196,7 @@ export const getAllUsersInfo = async (req, res) => {
 export const getUserInfo = async (req, res) => {
   console.log("getUserInfo", req.user);
   try {
-    const user = await CreateUser.findById(req.user.id).select("-password");
+    const user = await User.findById(req.user.id).select("-password");
 
     res.json(user);
   } catch (err) {
@@ -254,7 +224,6 @@ export const getAccessToken = (req, res) => {
       if (err) return res.status(400).json({ msg: "Please login now!" });
 
       const access_token = createAccessToken({ id: user.id });
-      console.log(user);
       res.json({ access_token });
     });
   } catch (err) {
@@ -282,5 +251,12 @@ const createRefreshToken = (payload) => {
 const createAccessToken = (payload) => {
   return jwt.sign(payload, process.env.ACCESS_TOKEN_SECRET, {
     expiresIn: "15m",
+  });
+};
+
+//Create activation token
+const createActivationToken = (payload) => {
+  return jwt.sign(payload, process.env.ACTIVATION_TOKEN_SECRET, {
+    expiresIn: "5m",
   });
 };
