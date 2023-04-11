@@ -3,10 +3,6 @@ const Schema = mongoose.Schema;
 
 const userSchema = new Schema(
   {
-    id: {
-      type: Number,
-      required: [true, "id is required"],
-    },
     firstName: {
       type: String,
       required: [true, "First Name is required"],
@@ -20,17 +16,21 @@ const userSchema = new Schema(
       required: [true, "Email is required"],
       trim: true,
     },
+    password: {
+      type: String,
+      required: [true, "temporary password is required"],
+    },
     dateOfBirth: {
       type: Date,
       required: [true, "Date of Birth is required"],
     },
     mobile: {
-      type: Number,
+      type: String,
       required: [true, "Mobile is required"],
     },
-    status: {
-      type: Boolean,
-      default: false,
+    accountType: {
+      type: String,
+      default: "student",
     },
   },
   { timestamps: true }
